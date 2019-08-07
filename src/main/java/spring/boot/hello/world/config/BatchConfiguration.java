@@ -6,6 +6,8 @@ import org.springframework.batch.core.configuration.annotation.EnableBatchProces
 import org.springframework.batch.core.configuration.annotation.JobBuilderFactory;
 import org.springframework.batch.core.configuration.annotation.StepBuilderFactory;
 import org.springframework.batch.core.configuration.annotation.StepScope;
+import org.springframework.batch.core.job.builder.FlowBuilder;
+import org.springframework.batch.core.job.flow.Flow;
 import org.springframework.batch.core.launch.support.RunIdIncrementer;
 import org.springframework.batch.item.database.JdbcCursorItemReader;
 import org.springframework.batch.item.database.builder.JdbcCursorItemReaderBuilder;
@@ -50,6 +52,8 @@ public class BatchConfiguration {
     @Autowired
     private FlatFileItemReader csvPersonReader;
 
+    @Autowired
+    private JdbcCursorItemReader<Person> personJdbcCursorItemReader;
 
 //    @Value("${app.users-location}")
 //    Resource[] resources;
@@ -65,6 +69,12 @@ public class BatchConfiguration {
                 .incrementer(new RunIdIncrementer())
                 .flow(csvToDbLowercaseStep())
                 .next(databaseToDataBaseLowercaseSlaveStep)
+//                .next(notificationStep())
+                .split(jobTaskExecutor())
+                .add(new FlowBuilder<Flow>("flow2")
+                        .start(notificationStep())
+                        .build()
+                )
                 .end()
                 .build();
     }
@@ -149,6 +159,14 @@ public class BatchConfiguration {
                 .writer(dbPersonCopyWriter)
                 .build();
 
+    }
+
+
+    @Bean
+    public Step notificationStep() {
+        return stepBuilderFactory.get("notificationStep")
+                .tasklet(new NotificationTasklet(personJdbcCursorItemReader))
+                .build();
     }
 
 
