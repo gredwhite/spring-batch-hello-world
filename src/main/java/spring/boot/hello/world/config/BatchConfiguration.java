@@ -1,4 +1,4 @@
-package spring.boot.hello.world;
+package spring.boot.hello.world.config;
 
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
@@ -7,6 +7,8 @@ import org.springframework.batch.core.configuration.annotation.JobBuilderFactory
 import org.springframework.batch.core.configuration.annotation.StepBuilderFactory;
 import org.springframework.batch.core.configuration.annotation.StepScope;
 import org.springframework.batch.core.launch.support.RunIdIncrementer;
+import org.springframework.batch.item.database.JdbcCursorItemReader;
+import org.springframework.batch.item.database.builder.JdbcCursorItemReaderBuilder;
 import org.springframework.batch.item.file.FlatFileItemReader;
 import org.springframework.batch.item.file.builder.FlatFileItemReaderBuilder;
 import org.springframework.batch.item.file.mapping.BeanWrapperFieldSetMapper;
@@ -14,20 +16,18 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.ResourcePatternResolver;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
-import spring.boot.hello.world.batch.DbPersonWriter;
-import spring.boot.hello.world.batch.MultiResourcePartitioner;
-import spring.boot.hello.world.batch.ToLowerCasePersonProcessor;
+import spring.boot.hello.world.batch.*;
 import spring.boot.hello.world.model.Person;
+import spring.boot.hello.world.model.PersonCopy;
 
+import javax.sql.DataSource;
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.Collection;
 
 @Configuration
 @EnableBatchProcessing
@@ -50,25 +50,35 @@ public class BatchConfiguration {
     @Autowired
     private FlatFileItemReader csvPersonReader;
 
+
+//    @Value("${app.users-location}")
+//    Resource[] resources;
+//
+//    @PostConstruct
+//    public void init() {
+//        System.out.println(resources);
+//    }
+
     @Bean
-    public Job job() {
+    public Job job(Step databaseToDataBaseLowercaseSlaveStep) {
         return jobBuilderFactory.get("myJob")
                 .incrementer(new RunIdIncrementer())
-                .flow(demoPartitionStep())
+                .flow(csvToDbLowercaseStep())
+                .next(databaseToDataBaseLowercaseSlaveStep)
                 .end()
                 .build();
     }
 
-    private Step demoPartitionStep() {
-        return stepBuilderFactory.get("demoPartitionStep")
-                .partitioner("demoPartitionStep", multiResourcePartitioner)
+    private Step csvToDbLowercaseStep() {
+        return stepBuilderFactory.get("csvToDbLowercaseStep")
+                .partitioner("csvToDbLowercaseStep", multiResourcePartitioner)
                 .gridSize(2)
-                .step(csvToDataBaseStep())
+                .step(csvToDataBaseSlaveStep())
                 .taskExecutor(jobTaskExecutor())
                 .build();
     }
 
-    private Step csvToDataBaseStep() {
+    private Step csvToDataBaseSlaveStep() {
         return stepBuilderFactory.get("csvToDatabaseStep")
                 .<Person, Person>chunk(50)
                 .reader(csvPersonReader)
@@ -116,4 +126,30 @@ public class BatchConfiguration {
         }
         return new MultiResourcePartitioner(Arrays.asList(csvResources));
     }
+
+    //second step
+    @Bean
+    public JdbcCursorItemReader<Person> sqlPersonReader(DataSource dataSource) {
+        return new JdbcCursorItemReaderBuilder<Person>()
+                .name("sqlPersonReader")
+                .<Person>beanRowMapper(Person.class)
+                .sql("select first_name, last_name from people")
+                .dataSource(dataSource)
+                .build();
+    }
+
+    @Bean
+    public Step databaseToDataBaseLowercaseSlaveStep(ToUpperCasePersonProcessor toUpperCasePersonProcessor,
+                                                     JdbcCursorItemReader<Person> jdbcCursorItemReader,
+                                                     DbPersonCopyWriter dbPersonCopyWriter) {
+        return stepBuilderFactory.get("databaseToDataBaseLowercaseSlaveStep")
+                .<Person, PersonCopy>chunk(50)
+                .reader(jdbcCursorItemReader)
+                .processor(toUpperCasePersonProcessor)
+                .writer(dbPersonCopyWriter)
+                .build();
+
+    }
+
+
 }

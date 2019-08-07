@@ -3,8 +3,8 @@ package spring.boot.hello.world.model;
 import javax.persistence.*;
 
 @Entity
-@Table(name = "people")
-public class Person {
+@Table(name = "people_processed")
+public class PersonCopy {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -12,10 +12,10 @@ public class Person {
     private String lastName;
     private String firstName;
 
-    public Person() {
+    public PersonCopy() {
     }
 
-    public Person(String firstName, String lastName) {
+    public PersonCopy(String firstName, String lastName) {
         this.firstName = firstName;
         this.lastName = lastName;
     }
