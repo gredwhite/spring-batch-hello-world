@@ -72,7 +72,7 @@ public class BatchConfiguration {
     private Step csvToDbLowercaseStep() {
         return stepBuilderFactory.get("csvToDbLowercaseStep")
                 .partitioner("csvToDbLowercaseStep", multiResourcePartitioner)
-                .gridSize(2)
+                .gridSize(10)
                 .step(csvToDataBaseSlaveStep())
                 .taskExecutor(jobTaskExecutor())
                 .build();
@@ -92,7 +92,7 @@ public class BatchConfiguration {
     @StepScope
     public FlatFileItemReader csvPersonReader(@Value("#{stepExecutionContext[filePath]}") String filePath) {
         return new FlatFileItemReaderBuilder()
-                .name("csvPersonReader")
+                .name("csvPersonReaderSplitted")
                 .resource(new FileSystemResource(filePath))
                 .delimited()
                 .names(new String[]{"firstName", "lastName"})
