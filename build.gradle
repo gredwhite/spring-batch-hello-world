@@ -31,6 +31,7 @@ dependencies {
     compile("org.springframework.boot:spring-boot-starter-data-jpa")
     //to fix exception o startup
     compile('org.hibernate:hibernate-core:5.4.2.Final')
+    compile("org.springframework.cloud:spring-cloud-starter-dataflow-server-local:1.7.3.RELEASE")
 
     testCompile("junit:junit")
 }
